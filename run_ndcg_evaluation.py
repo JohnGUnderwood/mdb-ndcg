@@ -8,9 +8,10 @@ This script evaluates NDCG using MongoDB search pipelines and ideal ranking list
 import argparse
 import json
 import sys
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Union
 from pathlib import Path
-
+from bson import ObjectId
+from bson.binary import Binary 
 try:
     from pymongo import MongoClient
     MONGO_AVAILABLE = True
@@ -40,17 +41,22 @@ def load_pipeline(pipeline_file: str) -> List[Dict[str, Any]]:
         raise ValueError("Invalid pipeline file format. Expected array or object with 'pipeline' key.")
 
 
-def inject_query_into_pipeline(pipeline: List[Dict[str, Any]], query: str, index_name: str) -> List[Dict[str, Any]]:
-    """Inject query string into pipeline by replacing {{QUERY}} and {{INDEX_NAME}} placeholders."""
+def inject_query_into_pipeline(pipeline: List[Dict[str, Any]], query: Union[str,Binary,List[float],List[int]], index_name: str) -> List[Dict[str, Any]]:
+    """Inject query into pipeline by replacing {{QUERY}} and {{INDEX_NAME}} placeholders."""
     def recursive_replace(obj):
         if isinstance(obj, dict):
             return {k: recursive_replace(v) for k, v in obj.items()}
         elif isinstance(obj, list):
             return [recursive_replace(item) for item in obj]
+        elif obj == '{{QUERY}}':
+            # Direct replacement for {{QUERY}} placeholder - supports any query type
+            return query
         elif isinstance(obj, str):
-            # Replace both placeholders in string values
-            result = obj.replace('{{QUERY}}', query)
-            result = result.replace('{{INDEX_NAME}}', index_name)
+            # Replace {{INDEX_NAME}} placeholder in string values
+            result = obj.replace('{{INDEX_NAME}}', index_name)
+            # Replace {{QUERY}} placeholder in string values only if query is a string
+            if isinstance(query, str):
+                result = result.replace('{{QUERY}}', query)
             return result
         else:
             return obj
@@ -58,7 +64,7 @@ def inject_query_into_pipeline(pipeline: List[Dict[str, Any]], query: str, index
     return recursive_replace(pipeline)
 
 
-def get_queries_from_ideal_rankings(db, search_collection) -> Dict[str, Dict[str, Any]]:
+def get_queries_from_ideal_rankings(db, filter: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     """
     Retrieve queries and their ideal rankings from MongoDB.
     
@@ -73,16 +79,16 @@ def get_queries_from_ideal_rankings(db, search_collection) -> Dict[str, Dict[str
     collection = db.ideal_rankings
     
     queries = {}
-    cursor = collection.find({"collection": search_collection}, {"query_id": 1, "query": 1, "ideal_ranking": 1})
+    cursor = collection.find(filter, {"query_id": 1, "query": 1, "ideal_ranking": 1})
     
     for doc in cursor:
         query_id = doc.get('query_id')
-        query_text = doc.get('query')
+        query = doc.get('query')
         ideal_ranking = doc.get('ideal_ranking', [])
         
-        if query_id and query_text:
+        if query_id and query:
             queries[query_id] = {
-                'query': query_text,
+                'query': query,
                 'ideal_ranking': ideal_ranking
             }
     
@@ -90,7 +96,7 @@ def get_queries_from_ideal_rankings(db, search_collection) -> Dict[str, Dict[str
     return queries
 
 
-def execute_search_pipeline(search_collection, search_index, pipeline: List[Dict[str, Any]], query: str) -> List[str]:
+def execute_search_pipeline(search_collection, search_index, pipeline: List[Dict[str, Any]], query: Union[str,Binary,List[float],List[int]]) -> List[str]:
     """Execute the search pipeline with injected query and return ranked document IDs."""
     
     # Inject query into pipeline
@@ -107,36 +113,6 @@ def execute_search_pipeline(search_collection, search_index, pipeline: List[Dict
             document_ids.append(str(doc_id))
     
     return document_ids
-
-
-def evaluate_ndcg(db, search_collection, search_index, pipeline: List[Dict[str, Any]], k: int, debug: bool = False, algorithm: str = 'binary') -> Dict[str, Any]:
-    """Evaluate NDCG using Python implementation."""
-    print(f"Evaluating NDCG@{k} using Python implementation")
-    
-    # Get queries and ideal rankings
-    queries_data = get_queries_from_ideal_rankings(db,search_collection.name)
-    
-    # Execute search pipeline for each query
-    search_results = {}
-    ideal_rankings = {}
-    
-    for query_id, data in queries_data.items():
-        query_text = data['query']
-        ideal_ranking = data['ideal_ranking']
-        
-        try:
-            ranked_docs = execute_search_pipeline(search_collection, search_index, pipeline, query_text)
-            search_results[query_id] = ranked_docs
-            # Keep the full ideal ranking for relevance determination
-            # The k parameter will be used in the NDCG calculation itself
-            ideal_rankings[query_id] = ideal_ranking
-        except Exception as e:
-            print(f"Warning: Failed to execute pipeline for query {query_id}: {e}")
-    
-    # Evaluate NDCG using graded relevance (since we have ideal rankings)
-    results = batch_evaluate_ndcg(search_results, ideal_rankings, k, debug, algorithm)
-    return results
-
 
 def main():
     """Main entry point for the NDCG evaluation runner."""
@@ -173,6 +149,9 @@ Examples:
                        help='MongoDB collection name for search documents (default: documents)')
     parser.add_argument('--search-index', '-i', default='text_search_index',
                        help='MongoDB Atlas Search index name (default: text_search_index)')
+    parser.add_argument('--query-filter', '-qf', default={'collection': 'documents'},
+                       type=json.loads,
+                       help='MongoDB query filter to retrieve query rankings as JSON string (default: {"collection": "documents"})')
     parser.add_argument('--uri', 
                        default='mongodb://admin:admin@localhost:27017/?directConnection=true&authSource=admin',
                        help='MongoDB connection string (default: mongodb://admin:admin@localhost:27017/?directConnection=true&authSource=admin)')
@@ -204,7 +183,29 @@ Examples:
         print(f"Loaded pipeline with {len(pipeline)} stages")
         
         # Run evaluation
-        results = evaluate_ndcg(db, search_collection, search_index, pipeline, args.k, args.debug, algorithm=args.algorithm)
+
+        # Get queries and ideal rankings
+        queries_data = get_queries_from_ideal_rankings(db,args.query_filter)
+        
+        # Execute search pipeline for each query
+        search_results = {}
+        ideal_rankings = {}
+        
+        for query_id, data in queries_data.items():
+            query = data['query']
+            ideal_ranking = data['ideal_ranking']
+            
+            try:
+                ranked_docs = execute_search_pipeline(search_collection, search_index, pipeline, query)
+                search_results[query_id] = ranked_docs
+                # Keep the full ideal ranking for relevance determination
+                # The k parameter will be used in the NDCG calculation itself
+                ideal_rankings[query_id] = ideal_ranking
+            except Exception as e:
+                print(f"Warning: Failed to execute pipeline for query {query_id}: {e}")
+
+        # Evaluate NDCG using graded relevance (since we have ideal rankings)
+        results = batch_evaluate_ndcg(search_results, ideal_rankings, args.k, args.debug, args.algorithm)
 
         # Output results
         print("\nNDCG Evaluation Results")

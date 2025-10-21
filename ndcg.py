@@ -44,11 +44,16 @@ def compute_ndcg_binary(search_results, relevant_docs, k, debug=False):
         return 0.0
     
     relevant_set = set(relevant_docs)
+    # Also add string representations to handle ObjectId/string mismatches
+    relevant_set_expanded = set()
+    for doc in relevant_set:
+        relevant_set_expanded.add(doc)
+        relevant_set_expanded.add(str(doc))
     
     # Create binary relevance scores for search results
     ranking_list = []
     for doc_id in search_results[:k]:
-        if doc_id in relevant_set:
+        if doc_id in relevant_set_expanded:
             ranking_list.append(1)  # relevant
         else:
             ranking_list.append(0)  # not relevant
@@ -64,8 +69,8 @@ def compute_ndcg_binary(search_results, relevant_docs, k, debug=False):
         # Show relevance calculation step by step
         print("\nRelevance calculation:")
         for i, doc_id in enumerate(search_results[:k]):
-            rel = 1 if doc_id in relevant_set else 0
-            print(f"  Position {i+1}: {doc_id} -> {'RELEVANT (1)' if rel else 'NOT RELEVANT (0)'}")
+            rel = 1 if doc_id in relevant_set_expanded else 0
+            print(f"  Position {i+1}: {str(doc_id)} -> {'RELEVANT (1)' if rel else 'NOT RELEVANT (0)'}")
         
         # Show DCG calculation step by step
         print(f"\nDCG@{k} calculation:")
@@ -167,7 +172,10 @@ def compute_ndcg_inverse_rank(search_results, ideal_ranking, k, debug=False):
     for i, doc_id in enumerate(ideal_ranking):
         # Use inverse ranking: 1/1, 1/2, 1/3, 1/4, 1/5, 0, 0...
         relevance_score = 1 / (i + 1)
+        # Store both string and ObjectId representations to handle type mismatches
+        doc_id_str = str(doc_id)
         relevance_map[doc_id] = relevance_score
+        relevance_map[doc_id_str] = relevance_score
     
     # Calculate DCG for search results
     dcg = 0.0
@@ -176,7 +184,7 @@ def compute_ndcg_inverse_rank(search_results, ideal_ranking, k, debug=False):
     if debug:
         print(f"\nRelevance scores based on ideal ranking (inverse ranking):")
         for i, doc_id in enumerate(ideal_ranking[:10]):  # Show first 10
-            print(f"  Position {i+1}: {doc_id} -> relevance = 1/{i+1} = {relevance_map[doc_id]}")
+            print(f"  Position {i+1}: {str(doc_id)} -> relevance = 1/{i+1} = {relevance_map[doc_id]}")
         if len(ideal_ranking) > 10:
             print(f"  ... and {len(ideal_ranking) - 10} more documents")
     
@@ -188,7 +196,7 @@ def compute_ndcg_inverse_rank(search_results, ideal_ranking, k, debug=False):
         
         if debug:
             print(f"\nDCG calculation for position {i}:")
-            print(f"  Document: {doc_id}")
+            print(f"  Document: {str(doc_id)}")
             print(f"  Relevance: {relevance}")
             print(f"  Discount: 1/log2({i}+1) = 1/{log2(i + 1):.3f} = {1/log2(i + 1):.3f}")
             print(f"  Gain: {relevance}/{log2(i + 1):.3f} = {gain:.3f}")
@@ -263,7 +271,10 @@ def compute_ndcg_decay(search_results, ideal_ranking, k, debug=False, scaling_fa
         # Use adaptive exponential decay
         exponent = max(0, base_relevance - i)
         relevance_score = 2 ** exponent if exponent > 0 else 0
+        # Store both string and ObjectId representations to handle type mismatches
+        doc_id_str = str(doc_id)
         relevance_map[doc_id] = relevance_score
+        relevance_map[doc_id_str] = relevance_score
     
     # Calculate DCG for search results
     dcg = 0.0
@@ -273,7 +284,7 @@ def compute_ndcg_decay(search_results, ideal_ranking, k, debug=False, scaling_fa
         print(f"\nAdaptive relevance scores (base={base_relevance:.2f}):")
         for i, doc_id in enumerate(ideal_ranking[:10]):  # Show first 10
             exponent = max(0, base_relevance - i)
-            print(f"  Position {i+1}: {doc_id} -> relevance = 2^{exponent:.2f} = {relevance_map[doc_id]:.2f}")
+            print(f"  Position {i+1}: {str(doc_id)} -> relevance = 2^{exponent:.2f} = {relevance_map[doc_id]:.2f}")
         if len(ideal_ranking) > 10:
             print(f"  ... and {len(ideal_ranking) - 10} more documents")
     
@@ -285,7 +296,7 @@ def compute_ndcg_decay(search_results, ideal_ranking, k, debug=False, scaling_fa
         
         if debug:
             print(f"\nDCG calculation for position {i}:")
-            print(f"  Document: {doc_id}")
+            print(f"  Document: {str(doc_id)}")
             print(f"  Relevance: {relevance:.2f}")
             print(f"  Discount: 1/log2({i}+1) = 1/{log2(i + 1):.3f} = {1/log2(i + 1):.3f}")
             print(f"  Gain: {relevance:.2f}/{log2(i + 1):.3f} = {gain:.3f}")
@@ -377,21 +388,23 @@ def batch_evaluate_ndcg(search_results_dict, ground_truth_dict, k, debug=False, 
                 print(f"\nSide-by-side comparison (top {k}):")
                 if algorithm in ['inverse_rank','decay'] and isinstance(ground_truth, list):
                     print("Position | Search Result | Ideal Ranking | Match?")
-                    print("-" * 50)
+                    print("-" * 55)
                     for i in range(k):
-                        search_doc = search_results[i] if i < len(search_results) else "<empty>"
-                        ideal_doc = ground_truth[i] if i < len(ground_truth) else "<empty>"
+                        search_doc = str(search_results[i]) if i < len(search_results) else "<empty>"
+                        ideal_doc = str(ground_truth[i]) if i < len(ground_truth) else "<empty>"
                         match = "✓" if search_doc == ideal_doc else "✗"
-                        print(f"{i+1:8d} | {search_doc:13s} | {ideal_doc:13s} | {match:6s}")
+                        print(f"{i+1:8d} | {search_doc:25s} | {ideal_doc:25s} | {match:6s}")
                 else:
                     print("Position | Search Result | Ideal Ranking | Relevant?")
-                    print("-" * 55)
+                    print("-" * 75)
                     relevant_set = set(ground_truth) if isinstance(ground_truth, list) else ground_truth
+                    # For binary relevance, show the ideal ranking in order of relevance (all relevant docs first)
+                    ideal_list = list(relevant_set) if isinstance(relevant_set, set) else ground_truth
                     for i in range(k):
-                        search_doc = search_results[i] if i < len(search_results) else "<empty>"
-                        ideal_doc = list(relevant_set)[i] if isinstance(relevant_set, set) and i < len(relevant_set) else "<empty>"
+                        search_doc = str(search_results[i]) if i < len(search_results) else "<empty>"
+                        ideal_doc = str(ideal_list[i]) if i < len(ideal_list) else "<empty>"
                         is_relevant = "✓" if (i < len(search_results) and search_results[i] in relevant_set) else "✗"
-                        print(f"{i+1:8d} | {search_doc:13s} | {ideal_doc:13s} | {is_relevant:9s}")
+                        print(f"{i+1:8d} | {search_doc:25s} | {ideal_doc:25s} | {is_relevant:9s}")
             
             # Choose the appropriate NDCG calculation method
             if algorithm == 'decay' and isinstance(ground_truth, list):

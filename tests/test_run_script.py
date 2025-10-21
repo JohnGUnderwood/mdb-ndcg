@@ -92,6 +92,36 @@ def test_query_injection():
     print("✓ Query injection working correctly")
 
 
+def test_binary_and_array_query_injection():
+    """Test Binary and array query injection functionality."""
+    print("Testing Binary and array query injection...")
+    
+    from bson.binary import Binary
+    import struct
+    
+    # Test Binary query injection
+    vector_pipeline = [
+        {"$vectorSearch": {"index": "{{INDEX_NAME}}", "path": "embedding", "queryVector": "{{QUERY}}"}}
+    ]
+    
+    # Create test Binary query
+    vector_data = [0.1, 0.2, 0.3, 0.4, 0.5]
+    binary_data = struct.pack('f' * len(vector_data), *vector_data)
+    binary_query = Binary(binary_data)
+    
+    injected_binary = inject_query_into_pipeline(vector_pipeline, binary_query, "vector_index")
+    assert injected_binary[0]["$vectorSearch"]["queryVector"] == binary_query
+    assert injected_binary[0]["$vectorSearch"]["index"] == "vector_index"
+    print("✓ Binary query injection working correctly")
+    
+    # Test array query injection
+    array_query = [0.1, 0.2, 0.3, 0.4, 0.5]
+    injected_array = inject_query_into_pipeline(vector_pipeline, array_query, "vector_index")
+    assert injected_array[0]["$vectorSearch"]["queryVector"] == array_query
+    assert injected_array[0]["$vectorSearch"]["index"] == "vector_index"
+    print("✓ Array query injection working correctly")
+
+
 def main():
     """Run all tests."""
     print("Running tests for NDCG Evaluation Runner")
@@ -101,6 +131,7 @@ def main():
         test_pipeline_loading()
         test_wrapped_pipeline_loading()
         test_query_injection()
+        test_binary_and_array_query_injection()
         
         print("\n" + "=" * 50)
         print("✅ All tests passed successfully!")

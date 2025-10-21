@@ -65,6 +65,7 @@ python run_ndcg_evaluation.py --pipeline ./example/atlas_search_pipeline.json --
 }
 
 ```
+Rankings can have other metadata which can be used with a filter when running the eval using `--query-filter` parameter. You must pass a valid json string with single quotes and double quotes around keys: `'{"collection":"documents"}'`.
 
 ### Pipeline Format
 ```json
@@ -103,6 +104,8 @@ options:
                         MongoDB collection name for search documents (default: documents)
   --search-index, -i SEARCH_INDEX
                         MongoDB Atlas Search index name (default: text_search_index)
+  --query-filter, -qf QUERY_FILTER
+                        MongoDB query filter to retrieve query rankings (default: {"collection": "documents"})
   --uri URI             MongoDB connection string (default: mongodb://admin:admin@localhost:27017/?directConnection=true&authSource=admin)
   --debug               Enable debug output (default: False)
 ```
