@@ -48,7 +48,7 @@ python run_ndcg_evaluation.py --pipeline ./example/atlas_search_pipeline.json --
 2. **Query Injection**: Automatically inject query strings using `{{QUERY}}` placeholders
 3. **Execute Search**: Run pipelines against your document collection
 4. **Compare Results**: Evaluate against ideal rankings stored in MongoDB
-5. **Calculate NDCG**: Use Python or MongoDB aggregation for final scores
+5. **Calculate NDCG**: Calculate NCDG scores for each query saved in MongoDB
 
 ### Pipeline Format
 ```json
