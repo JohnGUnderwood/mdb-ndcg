@@ -38,8 +38,8 @@ python run_ndcg_evaluation.py --pipeline ./example/atlas_search_pipeline.json
 # Evaluate NDCG@3 (top 3 results only)
 python run_ndcg_evaluation.py --pipeline ./example/atlas_search_pipeline.json --k 3
 
-# Use MongoDB aggregation for NDCG calculation
-python run_ndcg_evaluation.py --pipeline ./example/atlas_search_pipeline.json --aggregation
+# Evaluate NDCG@10 using inverse rank for relevance scores
+python run_ndcg_evaluation.py --pipeline ./example/atlas_search_pipeline.json --k 10 --algorithm 'inverse_rank'
 ```
 
 ## How It Works
