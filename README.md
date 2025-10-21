@@ -50,6 +50,22 @@ python run_ndcg_evaluation.py --pipeline ./example/atlas_search_pipeline.json --
 4. **Compare Results**: Evaluate against ideal rankings stored in MongoDB
 5. **Calculate NDCG**: Calculate NCDG scores for each query saved in MongoDB
 
+### Rankings Format
+```json
+{
+  "query_id":"query1",
+  "query":"machine learning",
+  "collection":"documents",
+  "ideal_ranking":[
+    "doc1",
+    "doc3",
+    "doc5",
+    "doc6",
+  ]
+}
+
+```
+
 ### Pipeline Format
 ```json
 [
