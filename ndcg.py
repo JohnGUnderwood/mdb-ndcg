@@ -1,21 +1,6 @@
 from math import log2
 from typing import Dict, List, Any
 
-# This script implements NDCG evaluation for search systems.
-# Discounted Cumulative Gain
-# DCG@k = Σ(i=1 to k) [rel_i / log2(i + 1)]
-
-# Ideal DCG (perfect ranking)
-# IDCG@k = Σ(i=1 to k) [rel_ideal_i / log2(i + 1)]
-
-# Normalized DCG
-# NDCG@k = DCG@k / IDCG@k
-
-# Multiple implementations are provided:
-# 1. Manual scoring with graded relevance scores
-# 2. Automated binary scoring with ground truth sets
-# 3. MongoDB aggregation implementation for production use
-
 # Compute NDCG given a list of ideal scores, a search result list and a cutoff k
 def compute_ndcg(ideal_scores, search_results, k, debug=False) -> float:
     """
