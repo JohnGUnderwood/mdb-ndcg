@@ -1,5 +1,5 @@
 from math import log2
-from typing import Dict, List, Any, Union
+from typing import Dict, List, Any
 
 # This script implements NDCG evaluation for search systems.
 # Discounted Cumulative Gain
@@ -17,7 +17,7 @@ from typing import Dict, List, Any, Union
 # 3. MongoDB aggregation implementation for production use
 
 # Compute NDCG given a list of ideal scores, a search result list and a cutoff k
-def compute_ndcg(ideal_scores, search_results, k):
+def compute_ndcg(ideal_scores, search_results, k, debug=False) -> float:
     """
     Compute NDCG given ideal scores and search results.
     Uses the formula:
@@ -29,23 +29,79 @@ def compute_ndcg(ideal_scores, search_results, k):
         ideal_scores: Dict mapping document IDs to their relevance scores
         search_results: List of document IDs ranked by the search system
         k: Number of top results to evaluate
+        debug: If True, print detailed NDCG calculation steps
     Returns:
         NDCG@k score between 0 and 1
     """
+    if debug:
+        print(f"\n📊 NDCG@{k} Calculation Details")
+        print("=" * 60)
+        print("Formula: NDCG@k = DCG@k / IDCG@k")
+        print("Where:")
+        print("  DCG@k  = Σ(i=1 to k) [relevance_i / log2(i + 1)]")
+        print("  IDCG@k = Σ(i=1 to k) [ideal_relevance_i / log2(i + 1)]")
+        print()
+    
     # Calculate DCG for search results
     dcg = 0.0
+    dcg_components = []
     for i, doc_id in enumerate(search_results[:k], start=1):
         relevance = ideal_scores.get(doc_id, 0)
-        gain = relevance / log2(i + 1)
+        discount = log2(i + 1)
+        gain = relevance / discount
         dcg += gain
+        dcg_components.append({
+            'position': i,
+            'doc_id': str(doc_id),
+            'relevance': relevance,
+            'discount': discount,
+            'gain': gain
+        })
     
-    # Calculate IDCG using the ideal scores
+    # Calculate IDCG using the ideal scores (sorted in descending order)
     idcg = 0.0
-    for i, score in enumerate(list(ideal_scores.values())[:k], start=1):
-        gain = score / log2(i + 1)
+    idcg_components = []
+    sorted_scores = sorted(ideal_scores.values(), reverse=True)
+    for i, score in enumerate(sorted_scores[:k], start=1):
+        discount = log2(i + 1)
+        gain = score / discount
         idcg += gain
+        idcg_components.append({
+            'position': i,
+            'relevance': score,
+            'discount': discount,
+            'gain': gain
+        })
     
     ndcg = dcg / idcg if idcg > 0 else 0.0
+
+    if debug:
+        print("🔍 DCG Calculation (Actual Search Results):")
+        print("Pos | Doc ID              | Relevance | log2(pos+1) | Gain      | Running DCG")
+        print("-" * 80)
+        running_dcg = 0.0
+        for comp in dcg_components:
+            running_dcg += comp['gain']
+            print(f"{comp['position']:3d} | {comp['doc_id']:19s} | {comp['relevance']:9.3f} | "
+                  f"{comp['discount']:11.3f} | {comp['gain']:9.3f} | {running_dcg:11.4f}")
+        print(f"                                                     Final DCG@{k}: {dcg:.4f}")
+        print()
+        
+        print("⭐ IDCG Calculation (Ideal Ranking - Best Possible):")
+        print("Pos | Ideal Relevance     | log2(pos+1) | Gain      | Running IDCG")
+        print("-" * 70)
+        running_idcg = 0.0
+        for comp in idcg_components:
+            running_idcg += comp['gain']
+            print(f"{comp['position']:3d} | {comp['relevance']:19.3f} | {comp['discount']:11.3f} | "
+                  f"{comp['gain']:9.3f} | {running_idcg:12.4f}")
+        print(f"                                           Final IDCG@{k}: {idcg:.4f}")
+        print()
+        
+        print("🎯 Final NDCG Calculation:")
+        print(f"NDCG@{k} = DCG@{k} / IDCG@{k}")
+        print(f"NDCG@{k} = {dcg:.4f} / {idcg:.4f}")
+        print(f"NDCG@{k} = {ndcg:.4f}")
 
     return ndcg
 
@@ -78,10 +134,15 @@ def compute_scores(ideal_ranking: List[Any], k: int, method: str = ['binary','in
     The adaptive base relevance is calculated as:
     base_relevance = max(1, scaling_factor * log2(len(ideal_ranking)) + 1)
     
-    This means:
-    - Short ideal ranking (3 docs): base ≈ 1 + 1.58 * scaling_factor = ~2.6 (giving scores 6, 3, 1)
-    - Medium ideal ranking (8 docs): base ≈ 1 + 3.0 * scaling_factor = ~4.0 (giving scores 16, 8, 4, 2)  
-    - Long ideal ranking (32 docs): base ≈ 1 + 5.0 * scaling_factor = ~6.0 (giving scores 64, 32, 16, 8, 4, 2, 1)
+    Each document gets a score of 2^(base_relevance - position), ensuring:
+    - ALL documents in the ideal ranking receive non-zero relevance scores
+    - Exponential decay provides strong preference for higher-ranked documents
+    - The decay continues smoothly beyond the base relevance threshold
+    
+    Examples:
+    - Short ideal ranking (3 docs): base ≈ 2.6 → scores [6.06, 3.03, 1.52]
+    - Medium ideal ranking (8 docs): base ≈ 4.0 → scores [16, 8, 4, 2, 1, 0.5, 0.25, 0.125]  
+    - Long ideal ranking (20 docs): base ≈ 5.3 → scores [20, 10, 5, 2.5, 1.25, 0.625, 0.313, ...]
     
     Args:
         ideal_ranking: List of document IDs in ideal order (most relevant first)
@@ -103,8 +164,8 @@ def compute_scores(ideal_ranking: List[Any], k: int, method: str = ['binary','in
             ideal_length = len(ideal_ranking)
             scaling_factor = 1.0 # Not currently configurable
             base_relevance = max(1, scaling_factor * log2(ideal_length) + 1)
-            exponent = max(0, base_relevance - i)
-            score = 2 ** exponent if exponent > 0 else 0  # Perfect ranking relevance with adaptive exponential decay
+            exponent = base_relevance - i
+            score = 2 ** exponent  # Perfect ranking relevance with adaptive exponential decay
         elif method == 'score':
             try:
                 if isinstance(doc_id, dict):
@@ -121,7 +182,7 @@ def compute_scores(ideal_ranking: List[Any], k: int, method: str = ['binary','in
         scores[str(doc_id)] = score
     return scores
 
-def batch_evaluate_ndcg(search_results_dict, ground_truth_dict, k, debug=False, algorithm='binary'):
+def batch_evaluate_ndcg(search_results_dict, ground_truth_dict, k, debug=False, scoring='binary'):
     """
     Evaluate NDCG for multiple queries in batch for automated testing.
     
@@ -130,7 +191,7 @@ def batch_evaluate_ndcg(search_results_dict, ground_truth_dict, k, debug=False, 
         ground_truth_dict: Dict mapping query_id to set/list of relevant document IDs or ideal rankings
         k: Number of top results to evaluate
         debug: If True, print detailed debug information for each query
-        algorithm: NDCG rank scoring algorithm to use (default: binary)
+        scoring: NDCG rank scoring algorithm to use (default: binary)
             'binary' - use binary relevance (0/1) for relevant document sets
             'inverse_rank' - use inverse rank graded relevance
             'decay' - use exponential decay graded relevance
@@ -174,15 +235,15 @@ def batch_evaluate_ndcg(search_results_dict, ground_truth_dict, k, debug=False, 
             
             if debug:
                 print(f"\n=== Debug Info for Query: {query_id} ===")
-                if algorithm in ['inverse_rank','decay'] and isinstance(ground_truth, list):
+                if scoring in ['inverse_rank','decay'] and isinstance(ground_truth, list):
                     print(f"Ideal ranking: {ground_truth}")
                 else:
                     print(f"Relevant documents: {ground_truth}")
-                print(f"Search results: {search_results}")
+                print(f"\nSearch results: {search_results}")
                 
                 # Show side-by-side comparison
                 print(f"\nSide-by-side comparison (top {k}):")
-                if algorithm in ['inverse_rank','decay'] and isinstance(ground_truth, list):
+                if scoring in ['inverse_rank','decay'] and isinstance(ground_truth, list):
                     print("Position | Search Result | Ideal Ranking | Match?")
                     print("-" * 55)
                     for i in range(k):
@@ -201,15 +262,15 @@ def batch_evaluate_ndcg(search_results_dict, ground_truth_dict, k, debug=False, 
                         ideal_doc = str(ideal_list[i]) if i < len(ideal_list) else "<empty>"
                         is_relevant = "✓" if (i < len(search_results) and search_results[i] in relevant_set) else "✗"
                         print(f"{i+1:8d} | {search_doc:25s} | {ideal_doc:25s} | {is_relevant:9s}")
-            
-            ndcg_score = compute_ndcg(compute_scores(ground_truth, k, method=algorithm, debug=debug), search_results, k)
+
+            ndcg_score = compute_ndcg(compute_scores(ground_truth, k, method=scoring, debug=debug), search_results, k, debug=debug)
 
             individual_scores[query_id] = ndcg_score
             total_ndcg += ndcg_score
             evaluated_queries += 1
     
     average_ndcg = total_ndcg / evaluated_queries if evaluated_queries > 0 else 0.0
-    
+
     return {
         'individual_scores': individual_scores,
         'average_ndcg': average_ndcg,

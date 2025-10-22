@@ -139,7 +139,7 @@ Examples:
                        help='Path to JSON file containing MongoDB aggregation pipeline')
     parser.add_argument('--k', type=int, default=10,
                        help='Number of top results to evaluate (default: 10)')
-    parser.add_argument('--algorithm', choices=['inverse_rank','binary','decay'], default='binary',
+    parser.add_argument('--scoring', choices=['inverse_rank','binary','decay','score'], default='binary',
                        help='NDCG relevance scoring algorithm to use for ideal rankings (default: binary)')
     parser.add_argument('--eval-database', '-d', default='search_evaluation',
                        help='MongoDB database name for storing ideal rankings (default: search_evaluation)')
@@ -205,19 +205,32 @@ Examples:
                 print(f"Warning: Failed to execute pipeline for query {query_id}: {e}")
 
         # Evaluate NDCG using graded relevance (since we have ideal rankings)
-        results = batch_evaluate_ndcg(search_results, ideal_rankings, args.k, args.debug, args.algorithm)
-
+        results = batch_evaluate_ndcg(search_results, ideal_rankings, args.k, args.debug, args.scoring)
+        
         # Output results
         print("\nNDCG Evaluation Results")
         print("=" * 50)
-        print(f"Average NDCG@{args.k}: {results['average_ndcg']:.4f}")
-        print(f"Total queries evaluated: {results['total_queries']}")
-        print()
-        
         if results['total_queries'] > 0:
             print("Individual Query Scores:")
             for query_id, score in results['individual_scores'].items():
-                print(f"  {query_id}: {score:.4f}")
+                print(f"  {query_id}: {score:.4f} {'🟢' if score >= 0.8 else '🟡' if score >= 0.6 else '🟠' if score >= 0.4 else '🔴'}")
+        print()
+        print(f"Average NDCG@{args.k}: {results['average_ndcg']:.4f}")
+        print(f"Total queries evaluated: {results['total_queries']}")
+        print()
+
+        # Add performance interpretation
+        if results['average_ndcg'] >= 0.8:
+            performance = "🟢 Excellent"
+        elif results['average_ndcg'] >= 0.6:
+            performance = "🟡 Good"
+        elif results['average_ndcg'] >= 0.4:
+            performance = "🟠 Fair"
+        else:
+            performance = "🔴 Poor"
+
+        print(f"\n📈 Performance Assessment: {performance} ({results['average_ndcg']:.1%})")
+        print("=" * 60)
     
     except Exception as e:
         print(f"Error: {e}")
