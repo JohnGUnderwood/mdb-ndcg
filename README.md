@@ -8,14 +8,15 @@ Evaluate search systems using NDCG (Normalized Discounted Cumulative Gain) with 
 - Configurable NDCG@k evaluation (k=1 to k=10)
 - Batch processing with ideal rankings stored in MongoDB
 - Binary relevance and graded relevance support
+- Sample data with vector embeddings to test behaviour
 
 ## Files
 
 - `ndcg.py` - Core NDCG calculation functions
 - `run_ndcg_evaluation.py` - Main evaluation runner
 - `setup.sh` - Environment setup script
-- `example/create_sample_data.py` - Creates sample test data
-- `example/atlas_search_pipeline.json` - Example search pipeline
+- `example/create_sample_data.sh` - Creates sample test data
+- `example/atlas_text_pipeline.json` - Example search pipeline
 - `tests/` - Test suite
 
 ## Quick Start
@@ -29,17 +30,20 @@ Evaluate search systems using NDCG (Normalized Discounted Cumulative Gain) with 
 source .venv/bin/activate
 ```
 
-### 2. Basic Usage
+### 2. Usage with sample data
 
 ```bash
-# Evaluate using the example pipeline (default k=5)
-python run_ndcg_evaluation.py --pipeline ./example/atlas_search_pipeline.json
+# Evaluate using the text example pipeline (default k=5)
+python run_ndcg_evaluation.py --pipeline ./example/search-text-pipeline.json
+
+# Evaluate using vector queries
+python run_ndcg_evaluation.py --pipeline ./example/search-voyage3large-pipeline.json --query-filter '{"type":"voyage-3-large"}' --search-index vector_search_index
 
 # Evaluate NDCG@3 (top 3 results only)
-python run_ndcg_evaluation.py --pipeline ./example/atlas_search_pipeline.json --k 3
+python run_ndcg_evaluation.py --pipeline ./example/search-text-pipeline.json --k 3
 
 # Evaluate NDCG@10 using inverse rank for relevance scores
-python run_ndcg_evaluation.py --pipeline ./example/atlas_search_pipeline.json --k 10 --scoring 'inverse_rank'
+python run_ndcg_evaluation.py --pipeline ./example/search-text-pipeline.json --k 10 --scoring 'score'
 ```
 
 ## How It Works
@@ -55,7 +59,7 @@ python run_ndcg_evaluation.py --pipeline ./example/atlas_search_pipeline.json --
 {
   "query_id":"query1",
   "query":"machine learning",
-  "collection":"documents",
+  "type":"text",
   "ideal_ranking":[
     "doc1",
     "doc3",
@@ -63,9 +67,22 @@ python run_ndcg_evaluation.py --pipeline ./example/atlas_search_pipeline.json --
     "doc6",
   ]
 }
-
 ```
-Rankings can have other metadata which can be used with a filter when running the eval using `--query-filter` parameter. You must pass a valid json string with single quotes and double quotes around keys: `'{"collection":"documents"}'`.
+Or with explicit scores and vector embedding:
+```json
+{
+  "query_id":"query1",
+  "query":"BinaryBinary.fromFloat32Array(new Float32Array([...])"
+  "type":"text",
+  "ideal_ranking":[
+    {"doc_id":"doc1","score":5}
+    {"doc_id":"doc3","score":4.5},
+    {"doc_id":"doc5","score":3},
+    {"doc_id":"doc6","score":1}  
+  ]
+}
+```
+Rankings can have other metadata which can be used with a filter when running the eval using `--query-filter` parameter. You must pass a valid json string with single quotes and double quotes around keys: `'{"type":"voyage-3-large"}'`.
 
 ### Pipeline Format
 ```json
@@ -174,6 +191,9 @@ from ndcg import batch_evaluate_ndcg
 search_results = {'query1': ['doc1', 'doc2', 'doc3', 'doc4', 'doc5']}
 ideal_ranking = {'query1': ['doc3', 'doc1', 'doc2', 'doc4', 'doc5']}  # Most relevant first
 
+# Explicit scoring
+ndcg_score = batch_evaluate_ndcg(search_results, ideal_ranking, k=5, scoring='score')
+
 # Binary relevance scoring (for relevant document sets)
 relevant_docs = {'query1': {'doc1', 'doc3', 'doc5'}}
 ndcg_binary = batch_evaluate_ndcg(search_results, relevant_docs, k=5, scoring='binary')
@@ -213,7 +233,6 @@ ndcg_decay = batch_evaluate_ndcg(search_results, ideal_ranking, k=5, scoring='de
 - Documents are scored individually with explicit numeric relevance values
 - Best for: When you have expert-curated relevance scores, user ratings, or other numeric quality measures
 - Input: List of dictionaries with 'doc_id' and 'score' keys: `[{'doc_id': 'doc1', 'score': 5}, {'doc_id': 'doc2', 'score': 3}]`
-- Note: Only available through Python API (`compute_scores` function), not via command line
 
 ```python
 # Example: Choose algorithm based on your evaluation needs

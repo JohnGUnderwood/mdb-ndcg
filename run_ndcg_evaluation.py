@@ -122,16 +122,16 @@ def main():
         epilog="""
 Examples:
   # Basic usage with pipeline file
-  python run_ndcg_evaluation.py --pipeline search_pipeline.json
+  python run_ndcg_evaluation.py --pipeline ./example/search-text-pipeline.json
   
   # Custom k value and MongoDB URI
-  python run_ndcg_evaluation.py --pipeline search_pipeline.json --k 5 --uri mongodb://localhost:27017
-  
+  python run_ndcg_evaluation.py --pipeline ./example/search-text-pipeline.json --k 5 --uri mongodb://localhost:27017
+
   # Custom search database/collection/index
-  python run_ndcg_evaluation.py --pipeline search_pipeline.json --search-database mydb --search-collection mycol --search-index myindex
-  
+  python run_ndcg_evaluation.py --pipeline ./example/search-text-pipeline.json --search-database mydb --search-collection mycol --search-index myindex
+
   # Enable debug output for detailed NDCG calculations
-  python run_ndcg_evaluation.py --pipeline search_pipeline.json --debug
+  python run_ndcg_evaluation.py --pipeline ./example/search-text-pipeline.json --debug
         """
     )
     
@@ -149,9 +149,9 @@ Examples:
                        help='MongoDB collection name for search documents (default: documents)')
     parser.add_argument('--search-index', '-i', default='text_search_index',
                        help='MongoDB Atlas Search index name (default: text_search_index)')
-    parser.add_argument('--query-filter', '-qf', default={'collection': 'documents'},
+    parser.add_argument('--query-filter', '-qf', default={'type': 'text'},
                        type=json.loads,
-                       help='MongoDB query filter to retrieve query rankings as JSON string (default: {"collection": "documents"})')
+                       help='MongoDB query filter to retrieve query rankings as JSON string (default: {"type":"text"})')
     parser.add_argument('--uri', 
                        default='mongodb://admin:admin@localhost:27017/?directConnection=true&authSource=admin',
                        help='MongoDB connection string (default: mongodb://admin:admin@localhost:27017/?directConnection=true&authSource=admin)')
@@ -206,15 +206,22 @@ Examples:
 
         # Evaluate NDCG using graded relevance (since we have ideal rankings)
         results = batch_evaluate_ndcg(search_results, ideal_rankings, args.k, args.debug, args.scoring)
+
+        # Group scores to get number of excellent, good, fair, poor queries
+        excellent_count = sum(1 for score in results['individual_scores'].values() if score >= 0.8)
+        good_count = sum(1 for score in results['individual_scores'].values() if 0.6 <= score < 0.8)
+        fair_count = sum(1 for score in results['individual_scores'].values() if 0.4 <= score < 0.6)
+        poor_count = sum(1 for score in results['individual_scores'].values() if score < 0.4)
         
         # Output results
         print("\nNDCG Evaluation Results")
         print("=" * 50)
-        if results['total_queries'] > 0:
-            print("Individual Query Scores:")
-            for query_id, score in results['individual_scores'].items():
-                print(f"  {query_id}: {score:.4f} {'🟢' if score >= 0.8 else '🟡' if score >= 0.6 else '🟠' if score >= 0.4 else '🔴'}")
-        print()
+        if args.debug:
+            if results['total_queries'] > 0:
+                print("Individual Query Scores:")
+                for query_id, score in results['individual_scores'].items():
+                    print(f"  {query_id}: {score:.4f} {'🟢' if score >= 0.8 else '🟡' if score >= 0.6 else '🟠' if score >= 0.4 else '🔴'}")
+            print()
         print(f"Average NDCG@{args.k}: {results['average_ndcg']:.4f}")
         print(f"Total queries evaluated: {results['total_queries']}")
         print()

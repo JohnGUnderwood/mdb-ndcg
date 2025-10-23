@@ -29,8 +29,8 @@ read -p "Do you want to create sample data now? (y/n): " create_sample
 
 if [ "$create_sample" == "y" ]; then
     echo "Creating sample data..."
-    python ./example/create_sample_data.py
+    ./example/create_sample_data.sh
 fi
 echo "3. Test the evaluation with (make sure virtual environment is activated):"
-echo "python run_ndcg_evaluation.py --pipeline ./example/atlas_search_pipeline.json"
+echo "python run_ndcg_evaluation.py --pipeline ./example/search-text-pipeline.json"
 echo ""

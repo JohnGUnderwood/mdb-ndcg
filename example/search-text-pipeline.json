@@ -1,0 +1,58 @@
+[
+  {
+    "$search": {
+      "index": "{{INDEX_NAME}}",
+      "compound": {
+        "should": [
+          {
+            "text": {
+              "query": "{{QUERY}}",
+              "path": "page",
+              "score": {
+                "boost": {
+                  "value": 3
+                }
+              }
+            }
+          },
+          {
+            "text": {
+              "query": "{{QUERY}}",
+              "path": "text",
+              "score": {
+                "boost": {
+                  "value": 1
+                }
+              }
+            }
+          },
+          {
+            "text": {
+              "query": "{{QUERY}}",
+              "path": "hierarchy",
+              "score": {
+                "boost": {
+                  "value": 2
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "$limit": 100
+  },
+  {
+    "$project": {
+      "_id": 1,
+      "page": 1,
+      "text": 1,
+      "hierarchy": 1,
+      "score": {
+        "$meta": "searchScore"
+      }
+    }
+  }
+]

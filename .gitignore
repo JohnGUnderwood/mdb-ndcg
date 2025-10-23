@@ -170,6 +170,8 @@ results/
 # MongoDB dumps
 dump/
 *.bson
+# Include sample data
+!example/data/search_evaluation/*.bson
 *.json.backup
 
 # Temporary files

@@ -138,7 +138,15 @@ def compute_scores(ideal_ranking: List[Any], k: int, method: str = ['binary','in
         Dictionary mapping document IDs to their computed relevance scores
     """
     scores = {}
-    for i, doc_id in enumerate(ideal_ranking, start=1):
+    for i, doc in enumerate(ideal_ranking, start=1):
+        # Check if we are iterating through dicts with scores or just IDs
+        if isinstance(doc, dict):
+            if 'doc_id' not in doc or 'score' not in doc:
+                raise ValueError("For dict entries in ideal_ranking, 'doc_id' and 'score' keys are required")
+            doc_id = doc.get('doc_id')
+        else:
+            doc_id = doc
+
         score = 0
         if method == 'binary':
             score = 1  # relevant
@@ -153,13 +161,13 @@ def compute_scores(ideal_ranking: List[Any], k: int, method: str = ['binary','in
             score = 2 ** exponent  # Perfect ranking relevance with adaptive exponential decay
         elif method == 'score':
             try:
-                if isinstance(doc_id, dict):
-                    score = int(doc_id['score'])
-                    doc_id = str(doc_id['doc_id'])
+                if isinstance(doc, dict):
+                    score = float(doc['score'])
+                    doc_id = str(doc['doc_id'])
                 else:
                     raise ValueError("For 'score' method, ideal_ranking must be a list of dicts with 'doc_id' and 'score' keys")
             except Exception as e:
-                raise ValueError("Invalid ideal ranking format for use with 'score' method. Must be a list of dicts: [{'doc_id':<doc_id>,'score':<int:score>}]") from e
+                raise ValueError("Invalid ideal ranking format for use with 'score' method. Must be a list of dicts: [{'doc_id':<doc_id>,'score':<score>}]") from e
         else:
             raise ValueError("Unknown scoring method")
 
@@ -219,29 +227,36 @@ def batch_evaluate_ndcg(search_results_dict, ground_truth_dict, k, debug=False, 
             ground_truth = ground_truth_dict[query_id]
             
             if debug:
-                print(f"\n=== Debug Info for Query: {query_id} ===")
-                if scoring in ['inverse_rank','decay'] and isinstance(ground_truth, list):
-                    print(f"Ideal ranking: {ground_truth}")
+                # Ground truth might be a list of Ids or Dicts with scores
+                # For debugging we just need list of Ids
+                if isinstance(ground_truth, list) and all(isinstance(item, dict) for item in ground_truth):
+                    gt_ids = [str(item['doc_id']) for item in ground_truth]
                 else:
-                    print(f"Relevant documents: {ground_truth}")
+                    gt_ids = ground_truth
+
+                print(f"\n=== Debug Info for Query: {query_id} ===")
+                if scoring in ['inverse_rank','decay'] and isinstance(gt_ids, list):
+                    print(f"Ideal ranking: {gt_ids}")
+                else:
+                    print(f"Relevant documents: {gt_ids}")
                 print(f"\nSearch results: {search_results}")
                 
                 # Show side-by-side comparison
                 print(f"\nSide-by-side comparison (top {k}):")
-                if scoring in ['inverse_rank','decay'] and isinstance(ground_truth, list):
+                if scoring in ['inverse_rank','decay'] and isinstance(gt_ids, list):
                     print("Position | Search Result | Ideal Ranking | Match?")
                     print("-" * 55)
                     for i in range(k):
                         search_doc = str(search_results[i]) if i < len(search_results) else "<empty>"
-                        ideal_doc = str(ground_truth[i]) if i < len(ground_truth) else "<empty>"
+                        ideal_doc = str(gt_ids[i]) if i < len(gt_ids) else "<empty>"
                         match = "✓" if search_doc == ideal_doc else "✗"
                         print(f"{i+1:8d} | {search_doc:25s} | {ideal_doc:25s} | {match:6s}")
                 else:
                     print("Position | Search Result | Ideal Ranking | Relevant?")
                     print("-" * 75)
-                    relevant_set = set(ground_truth) if isinstance(ground_truth, list) else ground_truth
+                    relevant_set = set(gt_ids) if isinstance(gt_ids, list) else gt_ids
                     # For binary relevance, show the ideal ranking in order of relevance (all relevant docs first)
-                    ideal_list = list(relevant_set) if isinstance(relevant_set, set) else ground_truth
+                    ideal_list = list(relevant_set) if isinstance(relevant_set, set) else gt_ids
                     for i in range(k):
                         search_doc = str(search_results[i]) if i < len(search_results) else "<empty>"
                         ideal_doc = str(ideal_list[i]) if i < len(ideal_list) else "<empty>"
