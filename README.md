@@ -12,8 +12,7 @@ Evaluate search systems using NDCG (Normalized Discounted Cumulative Gain) with 
 
 ## Files
 
-- `ndcg.py` - Core NDCG calculation functions
-- `run_ndcg_evaluation.py` - Main evaluation runner
+- `ndcg.py` - NDCG calculation functions and main evaluation runner
 - `setup.sh` - Environment setup script
 - `example/create_sample_data.sh` - Creates sample test data
 - `example/atlas_text_pipeline.json` - Example search pipeline
@@ -34,16 +33,16 @@ source .venv/bin/activate
 
 ```bash
 # Evaluate using the text example pipeline (default k=5)
-python run_ndcg_evaluation.py --pipeline ./example/search-text-pipeline.json
+python ndcg.py --pipeline ./example/search-text-pipeline.json
 
 # Evaluate using vector queries
-python run_ndcg_evaluation.py --pipeline ./example/search-voyage3large-pipeline.json --query-filter '{"type":"voyage-3-large"}' --search-index vector_search_index
+python ndcg.py --pipeline ./example/search-voyage3large-pipeline.json --query-filter '{"type":"voyage-3-large"}' --search-index vector_search_index
 
 # Evaluate NDCG@3 (top 3 results only)
-python run_ndcg_evaluation.py --pipeline ./example/search-text-pipeline.json --k 3
+python ndcg.py --pipeline ./example/search-text-pipeline.json --k 3
 
 # Evaluate NDCG@10 using inverse rank for relevance scores
-python run_ndcg_evaluation.py --pipeline ./example/search-text-pipeline.json --k 10 --scoring 'score'
+python ndcg.py --pipeline ./example/search-text-pipeline.json --k 10 --scoring 'score'
 ```
 
 ## How It Works
@@ -105,7 +104,7 @@ Rankings can have other metadata which can be used with a filter when running th
 ## Command Line Options
 
 ```bash
-python run_ndcg_evaluation.py [OPTIONS]
+python ndcg.py [OPTIONS]
 
 options:
   -h, --help            show this help message and exit
@@ -122,12 +121,39 @@ options:
   --search-index, -i SEARCH_INDEX
                         MongoDB Atlas Search index name (default: text_search_index)
   --query-filter, -qf QUERY_FILTER
-                        MongoDB query filter to retrieve query rankings (default: {"collection": "documents"})
+                        MongoDB query filter to retrieve query rankings as JSON string (default: {"type":"text"})
   --uri URI             MongoDB connection string (default: mongodb://admin:admin@localhost:27017/?directConnection=true&authSource=admin)
   --debug               Enable debug output (default: False)
+  --print, -p           Whether to print results to console (default: True)
+
+    Examples:
+    # Basic usage with pipeline file
+    python ndcg.py --pipeline ./example/search-text-pipeline.json
+    
+    # Custom k value and MongoDB URI
+    python ndcg.py --pipeline ./example/search-text-pipeline.json --k 5 --uri mongodb://localhost:27017
+
+    # Custom search database/collection/index
+    python ndcg.py --pipeline ./example/search-text-pipeline.json --search-database mydb --search-collection mycol --search-index myindex
+
+    # Enable debug output for detailed NDCG calculations
+    python ndcg.py --pipeline ./example/search-text-pipeline.json --debug
 ```
 
 ## Python API
+
+### Executing and returning for programmatic acces
+```python
+from ndcg import run
+args = {
+  "k":5,
+  "pipeline":"./example/search-text-pipeline.json",
+  "scoring":"inverse_rank",
+  "search_index":"text_search_index",
+  "query_filter":{"type":"text"}
+}
+run(args)
+```
 
 ### Basic NDCG Evaluation
 
@@ -257,7 +283,7 @@ from ndcg import compute_ndcg
 scored_results = {'query1': ['doc1', 'doc2', 'doc3', 'doc4', 'doc5']}
 expert_scores = {'query1': [{'doc_id': 'doc1', 'score': 5}, {'doc_id': 'doc3', 'score': 4}, {'doc_id': 'doc5', 'score': 2}]}
 # Note: For 'score' algorithm, use compute_scores and compute_ndcg directly
-ndcg_expert = compute_ndcg(expert_scores['query1'], scored_results['query1'], k=5, scoringd='score')
+ndcg_expert = compute_ndcg(expert_scores['query1'], scored_results['query1'], k=5, scoring='score')
 ```
 
 ## Requirements
