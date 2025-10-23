@@ -206,12 +206,6 @@ Examples:
 
         # Evaluate NDCG using graded relevance (since we have ideal rankings)
         results = batch_evaluate_ndcg(search_results, ideal_rankings, args.k, args.debug, args.scoring)
-
-        # Group scores to get number of excellent, good, fair, poor queries
-        excellent_count = sum(1 for score in results['individual_scores'].values() if score >= 0.8)
-        good_count = sum(1 for score in results['individual_scores'].values() if 0.6 <= score < 0.8)
-        fair_count = sum(1 for score in results['individual_scores'].values() if 0.4 <= score < 0.6)
-        poor_count = sum(1 for score in results['individual_scores'].values() if score < 0.4)
         
         # Output results
         print("\nNDCG Evaluation Results")
@@ -222,6 +216,19 @@ Examples:
                 for query_id, score in results['individual_scores'].items():
                     print(f"  {query_id}: {score:.4f} {'🟢' if score >= 0.8 else '🟡' if score >= 0.6 else '🟠' if score >= 0.4 else '🔴'}")
             print()
+        
+        # Group scores to get number of excellent, good, fair, poor queries
+        excellent_count = sum(1 for score in results['individual_scores'].values() if score >= 0.8)
+        good_count = sum(1 for score in results['individual_scores'].values() if 0.6 <= score < 0.8)
+        fair_count = sum(1 for score in results['individual_scores'].values() if 0.4 <= score < 0.6)
+        poor_count = sum(1 for score in results['individual_scores'].values() if score < 0.4)
+
+        print(f"🟢 Excellent:\t{excellent_count/len(results['individual_scores']):.1%} ({excellent_count})")
+        print(f"🟡 Good:\t{good_count/len(results['individual_scores']):.1%} ({good_count})")
+        print(f"🟠 Fair:\t{fair_count/len(results['individual_scores']):.1%} ({fair_count})")
+        print(f"🔴 Poor:\t{poor_count/len(results['individual_scores']):.1%} ({poor_count})")
+        print()
+
         print(f"Average NDCG@{args.k}: {results['average_ndcg']:.4f}")
         print(f"Total queries evaluated: {results['total_queries']}")
         print()

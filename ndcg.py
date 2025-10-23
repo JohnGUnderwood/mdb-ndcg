@@ -2,7 +2,7 @@ from math import log2
 from typing import Dict, List, Any
 
 # Compute NDCG given a list of ideal scores, a search result list and a cutoff k
-def compute_ndcg(ideal_scores, search_results, k, debug=False) -> float:
+def compute_ndcg(ideal_ranking, search_results, k, method='binary', debug=False) -> float:
     """
     Compute NDCG given ideal scores and search results.
     Uses the formula:
@@ -18,6 +18,9 @@ def compute_ndcg(ideal_scores, search_results, k, debug=False) -> float:
     Returns:
         NDCG@k score between 0 and 1
     """
+
+    ideal_scores = compute_scores(ideal_ranking, method=method)
+
     if debug:
         print(f"\n📊 NDCG@{k} Calculation Details")
         print("=" * 60)
@@ -31,7 +34,12 @@ def compute_ndcg(ideal_scores, search_results, k, debug=False) -> float:
     dcg = 0.0
     dcg_components = []
     for i, doc_id in enumerate(search_results[:k], start=1):
-        relevance = ideal_scores.get(doc_id, 0)
+        # If using binary score get 1 if doc in ideal ranking @ k else 0
+        if method == 'binary':
+            relevance = 1 if doc_id in list(ideal_scores.keys())[:k] else 0
+        # If using explicit or implicit scores get score
+        else:
+            relevance = ideal_scores.get(doc_id, 0)
         discount = log2(i + 1)
         gain = relevance / discount
         dcg += gain
@@ -43,11 +51,15 @@ def compute_ndcg(ideal_scores, search_results, k, debug=False) -> float:
             'gain': gain
         })
     
-    # Calculate IDCG using the ideal scores (sorted in descending order)
+    # Calculate IDCG using the ideal scores 
     idcg = 0.0
     idcg_components = []
-    sorted_scores = sorted(ideal_scores.values(), reverse=True)
-    for i, score in enumerate(sorted_scores[:k], start=1):
+    if method != 'binary':
+        scores = list(ideal_scores.values())
+    else:
+        # For binary relevance the scores are 1 for all relevant docs
+        scores = [1] * min(len(ideal_ranking), k)
+    for i, score in enumerate(scores[:k], start=1):
         discount = log2(i + 1)
         gain = score / discount
         idcg += gain
@@ -57,7 +69,7 @@ def compute_ndcg(ideal_scores, search_results, k, debug=False) -> float:
             'discount': discount,
             'gain': gain
         })
-    
+
     ndcg = dcg / idcg if idcg > 0 else 0.0
 
     if debug:
@@ -91,7 +103,7 @@ def compute_ndcg(ideal_scores, search_results, k, debug=False) -> float:
     return ndcg
 
 # Compute score for docs in ideal ranking
-def compute_scores(ideal_ranking: List[Any], k: int, method: str = ['binary','inverse_rank','decay','score'], debug=False) -> Dict[str, float]:
+def compute_scores(ideal_ranking: List[Any], method: str = ['binary','inverse_rank','decay','score']) -> Dict[str, float]:
     """
     Compute relevance scores for documents in the ideal ranking based on the specified method.
     There are four methods supported, 1 explicit and 3 implicit:
@@ -149,7 +161,7 @@ def compute_scores(ideal_ranking: List[Any], k: int, method: str = ['binary','in
 
         score = 0
         if method == 'binary':
-            score = 1  # relevant
+            score = 1  # All docs in ideal ranking are relevant
         elif method == 'inverse_rank':
             score = 1 / i
         elif method == 'decay':
@@ -243,7 +255,15 @@ def batch_evaluate_ndcg(search_results_dict, ground_truth_dict, k, debug=False, 
                 
                 # Show side-by-side comparison
                 print(f"\nSide-by-side comparison (top {k}):")
-                if scoring in ['inverse_rank','decay'] and isinstance(gt_ids, list):
+                if scoring == 'binary' and isinstance(gt_ids, list):
+                    print("Position | Search Result | Relevant? | Ideal Ranking")
+                    print("-" * 75)
+                    for i in range(k):
+                        search_doc = str(search_results[i]) if i < len(search_results) else "<empty>"
+                        ideal_doc = str(gt_ids[i]) if i < len(gt_ids) else "<empty>"
+                        is_relevant = "✓" if (i < len(search_results) and search_results[i] in gt_ids[:k]) else "✗"
+                        print(f"{i+1:8d} | {search_doc:25s} | {is_relevant:9s} | {ideal_doc:25s} ")
+                else:
                     print("Position | Search Result | Ideal Ranking | Match?")
                     print("-" * 55)
                     for i in range(k):
@@ -251,19 +271,8 @@ def batch_evaluate_ndcg(search_results_dict, ground_truth_dict, k, debug=False, 
                         ideal_doc = str(gt_ids[i]) if i < len(gt_ids) else "<empty>"
                         match = "✓" if search_doc == ideal_doc else "✗"
                         print(f"{i+1:8d} | {search_doc:25s} | {ideal_doc:25s} | {match:6s}")
-                else:
-                    print("Position | Search Result | Ideal Ranking | Relevant?")
-                    print("-" * 75)
-                    relevant_set = set(gt_ids) if isinstance(gt_ids, list) else gt_ids
-                    # For binary relevance, show the ideal ranking in order of relevance (all relevant docs first)
-                    ideal_list = list(relevant_set) if isinstance(relevant_set, set) else gt_ids
-                    for i in range(k):
-                        search_doc = str(search_results[i]) if i < len(search_results) else "<empty>"
-                        ideal_doc = str(ideal_list[i]) if i < len(ideal_list) else "<empty>"
-                        is_relevant = "✓" if (i < len(search_results) and search_results[i] in relevant_set) else "✗"
-                        print(f"{i+1:8d} | {search_doc:25s} | {ideal_doc:25s} | {is_relevant:9s}")
 
-            ndcg_score = compute_ndcg(compute_scores(ground_truth, k, method=scoring, debug=debug), search_results, k, debug=debug)
+            ndcg_score = compute_ndcg(ground_truth, search_results, k, method=scoring, debug=debug)
 
             individual_scores[query_id] = ndcg_score
             total_ndcg += ndcg_score

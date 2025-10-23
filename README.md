@@ -132,13 +132,12 @@ options:
 ### Basic NDCG Evaluation
 
 ```python
-from ndcg import compute_ndcg, compute_scores, batch_evaluate_ndcg
+from ndcg import compute_ndcg,batch_evaluate_ndcg
 
 # Binary evaluation using compute_ndcg with compute_scores
 search_results = ['doc1', 'doc2', 'doc3', 'doc4', 'doc5']
 relevant_docs = ['doc1', 'doc3', 'doc5']  # List of relevant documents (binary relevance)
-ideal_scores = compute_scores(relevant_docs, k=5, method='binary')
-ndcg_score = compute_ndcg(ideal_scores, search_results, k=5)
+ndcg_score = compute_ndcg(relevant_docs, search_results, k=5, method='binary')
 
 # Batch evaluation (automatically handles scoring internally)
 search_batch = {'query1': ['doc1', 'doc2'], 'query2': ['doc3', 'doc4']}
@@ -155,16 +154,16 @@ from ndcg import compute_scores
 
 # Method 1: Binary relevance (implicit) - all documents in ranking are relevant
 relevant_docs = ['doc3', 'doc1', 'doc5']
-binary_scores = compute_scores(relevant_docs, k=5, method='binary')
+binary_scores = compute_scores(relevant_docs, method='binary')
 # Returns: {'doc3': 1, 'doc1': 1, 'doc5': 1}
 
 # Method 2: Inverse rank graded relevance (implicit) - position-based scoring
 ideal_ranking = ['doc3', 'doc1', 'doc5', 'doc2', 'doc4']  # Most relevant first
-inverse_scores = compute_scores(ideal_ranking, k=5, method='inverse_rank')
+inverse_scores = compute_scores(ideal_ranking, method='inverse_rank')
 # Returns: {'doc3': 1.0, 'doc1': 0.5, 'doc5': 0.333, 'doc2': 0.25, 'doc4': 0.2}
 
 # Method 3: Exponential decay graded relevance (implicit) - adaptive scoring
-decay_scores = compute_scores(ideal_ranking, k=5, method='decay')
+decay_scores = compute_scores(ideal_ranking, method='decay')
 # Returns exponentially decaying scores based on ranking length
 
 # Method 4: Explicit scores (explicit) - externally provided relevance scores
@@ -173,12 +172,8 @@ scored_docs = [
     {'doc_id': 'doc2', 'score': 3},
     {'doc_id': 'doc3', 'score': 4}
 ]
-explicit_scores = compute_scores(scored_docs, k=5, method='score')
+explicit_scores = compute_scores(scored_docs, method='score')
 # Returns: {'doc1': 5, 'doc2': 3, 'doc3': 4}
-
-# Use the scores with compute_ndcg
-search_results = ['doc1', 'doc2', 'doc3', 'doc4', 'doc5']
-ndcg_score = compute_ndcg(inverse_scores, search_results, k=5)
 ```
 
 ### Advanced NDCG Scoring Algorithms
@@ -258,12 +253,11 @@ ndcg_decay_simple = batch_evaluate_ndcg(short_query, short_ideal, k=5, scoring='
 ndcg_decay_complex = batch_evaluate_ndcg(complex_query, complex_ideal, k=5, scoring='decay')
 
 # Explicit Score: Using expert-provided relevance scores
-from ndcg import compute_ndcg, compute_scores
+from ndcg import compute_ndcg
 scored_results = {'query1': ['doc1', 'doc2', 'doc3', 'doc4', 'doc5']}
 expert_scores = {'query1': [{'doc_id': 'doc1', 'score': 5}, {'doc_id': 'doc3', 'score': 4}, {'doc_id': 'doc5', 'score': 2}]}
 # Note: For 'score' algorithm, use compute_scores and compute_ndcg directly
-ideal_scores = compute_scores(expert_scores['query1'], k=5, method='score')
-ndcg_expert = compute_ndcg(ideal_scores, scored_results['query1'], k=5)
+ndcg_expert = compute_ndcg(expert_scores['query1'], scored_results['query1'], k=5, scoringd='score')
 ```
 
 ## Requirements
