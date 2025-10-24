@@ -375,11 +375,19 @@ def get_queries_from_ideal_rankings(db, filter: Dict[str, Any]) -> Dict[str, Dic
 
     return queries
 
-def execute_search_pipeline(search_collection, search_index, pipeline: List[Dict[str, Any]], query: Union[str,Binary,List[float],List[int]]) -> List[str]:
+def execute_search_pipeline(search_collection, search_index, pipeline: List[Dict[str, Any]], query: Union[str,Binary,List[float],List[int]], limit: int) -> List[str]:
     """Execute the search pipeline with injected query and return ranked document IDs."""
     
     # Inject query into pipeline
     injected_pipeline = inject_query_into_pipeline(pipeline, query, search_index)
+    # Add limit stage if not already present
+    if any('$limit' in stage for stage in injected_pipeline):    
+        for stage in injected_pipeline:
+                if '$limit' in stage:
+                    stage['$limit'] = limit
+                    break
+    else:
+        injected_pipeline.append({'$limit': limit})
     
     # Execute pipeline on documents collection
     results = list(search_collection.aggregate(injected_pipeline))
@@ -495,7 +503,7 @@ def run(args):
             ideal_ranking = data['ideal_ranking']
             
             try:
-                ranked_docs = execute_search_pipeline(search_collection, search_index, pipeline, query)
+                ranked_docs = execute_search_pipeline(search_collection, search_index, pipeline, query, args.k)
                 search_results[query_id] = ranked_docs
                 # Keep the full ideal ranking for relevance determination
                 # The k parameter will be used in the NDCG calculation itself
@@ -546,6 +554,8 @@ def run(args):
             print(f"\n📈 Performance Assessment: {performance} ({results['average_ndcg']:.1%})")
             print("=" * 60)
         else:
+            # Add search results to output for further processing
+            results['search_results'] = search_results
             return results
     
     except Exception as e:
