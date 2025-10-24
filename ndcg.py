@@ -1,5 +1,17 @@
 from math import log2
-from typing import Dict, List, Any
+import argparse
+import json
+import sys
+from typing import Dict, List, Any, Union
+from pathlib import Path
+try:
+    from pymongo import MongoClient
+    from bson.binary import Binary
+    MONGO_AVAILABLE = True
+except ImportError:
+    MONGO_AVAILABLE = False
+    print("Error: pymongo is required. Install with: pip install pymongo")
+    sys.exit(1)
 
 # Compute NDCG given a list of ideal scores, a search result list and a cutoff k
 def compute_ndcg(ideal_ranking, search_results, k, method='binary', debug=False) -> float:
@@ -292,14 +304,6 @@ Simplified NDCG Evaluation Runner
 These functions evaluate NDCG using MongoDB search pipelines and ideal ranking lists.
 """
 
-import argparse
-import json
-import sys
-from typing import Dict, List, Any, Union
-from pathlib import Path
-from bson import ObjectId
-from bson.binary import Binary 
-
 def load_pipeline(pipeline_file: str) -> List[Dict[str, Any]]:
     """Load MongoDB aggregation pipeline from JSON file."""
     pipeline_path = Path(pipeline_file)
@@ -453,21 +457,8 @@ def run(args):
     # Validate required arguments
     if args.pipeline is None:
         raise ValueError("pipeline argument is required")
-
-    try:
-        from pymongo import MongoClient
-        MONGO_AVAILABLE = True
-    except ImportError:
-        MONGO_AVAILABLE = False
-        print("Error: pymongo is required. Install with: pip install pymongo")
-        sys.exit(1)
         
     try:
-        if not MONGO_AVAILABLE:
-            print("Error: pymongo is required for MongoDB functionality.")
-            print("Install it with: pip install pymongo")
-            sys.exit(1)
-        
         # Turn off debugging if output is not print
         if args.print is False:
             args.debug = False
