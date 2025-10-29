@@ -46,9 +46,9 @@ def compute_ndcg(ideal_ranking, search_results, k, method='binary', debug=False)
     dcg = 0.0
     dcg_components = []
     for i, doc_id in enumerate(search_results[:k], start=1):
-        # If using binary score get 1 if doc in ideal ranking @ k else 0
+        # If using binary score get 1 if doc in ideal ranking else 0
         if method == 'binary':
-            relevance = 1 if doc_id in list(ideal_scores.keys())[:k] else 0
+            relevance = 1 if doc_id in list(ideal_scores.keys()) else 0
         # If using explicit or implicit scores get score
         else:
             relevance = ideal_scores.get(doc_id, 0)

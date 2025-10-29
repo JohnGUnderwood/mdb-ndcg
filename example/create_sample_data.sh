@@ -20,7 +20,7 @@ DB_NAME="search_evaluation"
 
 # Restore data from dump directory
 # Assumes data files are in example/data/search_evaluation/
-DATA_DIR="./example/data/search_evaluation"
+DATA_DIR="./example/data"
 
 if [ -d "$DATA_DIR" ]; then
     mongorestore --uri "$MONGO_URI" \
