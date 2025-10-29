@@ -43,14 +43,50 @@ try {
             fields: [
                 {
                     type: 'vector',
-                    path: 'embedding.voyage-3-large',
+                    path: 'embedding.voyage-3-large.2048d',
+                    numDimensions: 2048,
+                    similarity: 'dotProduct'
+                },
+                {
+                    type: 'vector',
+                    path: 'embedding.voyage-context-3.2048d',
+                    numDimensions: 2048,
+                    similarity: 'dotProduct'
+                },
+                {
+                    type: 'vector',
+                    path: 'embedding.voyage-3-large.1024d',
                     numDimensions: 1024,
                     similarity: 'dotProduct'
                 },
                 {
                     type: 'vector',
-                    path: 'embedding.voyage-context-3',
-                    numDimensions: 1024,
+                    path: 'embedding.voyage-context-3.1024d',
+                    numDimensions: 2048,
+                    similarity: 'dotProduct'
+                },
+            {
+                    type: 'vector',
+                    path: 'embedding.voyage-3-large.512d',
+                    numDimensions: 512,
+                    similarity: 'dotProduct'
+                },
+                {
+                    type: 'vector',
+                    path: 'embedding.voyage-context-3.512d',
+                    numDimensions: 512,
+                    similarity: 'dotProduct'
+                },
+                {
+                    type: 'vector',
+                    path: 'embedding.voyage-3-large.256d',
+                    numDimensions: 256,
+                    similarity: 'dotProduct'
+                },
+                {
+                    type: 'vector',
+                    path: 'embedding.voyage-context-3.256d',
+                    numDimensions: 256,
                     similarity: 'dotProduct'
                 }
             ]

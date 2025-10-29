@@ -2,7 +2,7 @@
     "$vectorSearch": {
         "index":"{{INDEX_NAME}}",
         "queryVector": "{{QUERY}}",
-        "path": "embedding.voyage-3-large",
+        "path": "embedding.voyage-context-3.2048d",
         "limit": 20,
         "numCandidates": 100
     }
