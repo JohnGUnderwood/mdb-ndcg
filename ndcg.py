@@ -259,31 +259,19 @@ def batch_evaluate_ndcg(search_results_dict, ground_truth_dict, k, debug=False, 
                     gt_ids = ground_truth
 
                 print(f"\n=== Debug Info for Query: {query_id} ===")
-                if scoring in ['inverse_rank','decay'] and isinstance(gt_ids, list):
-                    print(f"Ideal ranking: {gt_ids}")
-                else:
-                    print(f"Relevant documents: {gt_ids}")
+                print(f"Ideal ranking: {gt_ids}")
                 print(f"\nSearch results: {search_results}")
                 
                 # Show side-by-side comparison
                 print(f"\nSide-by-side comparison (top {k}):")
-                if scoring == 'binary' and isinstance(gt_ids, list):
-                    print("Position | Search Result | Relevant? | Ideal Ranking")
-                    print("-" * 75)
-                    for i in range(k):
-                        search_doc = str(search_results[i]) if i < len(search_results) else "<empty>"
-                        ideal_doc = str(gt_ids[i]) if i < len(gt_ids) else "<empty>"
-                        is_relevant = "✓" if (i < len(search_results) and search_results[i] in gt_ids[:k]) else "✗"
-                        print(f"{i+1:8d} | {search_doc:25s} | {is_relevant:9s} | {ideal_doc:25s} ")
-                else:
-                    print("Position | Search Result | Ideal Ranking | Match?")
-                    print("-" * 55)
-                    for i in range(k):
-                        search_doc = str(search_results[i]) if i < len(search_results) else "<empty>"
-                        ideal_doc = str(gt_ids[i]) if i < len(gt_ids) else "<empty>"
-                        match = "✓" if search_doc == ideal_doc else "✗"
-                        print(f"{i+1:8d} | {search_doc:25s} | {ideal_doc:25s} | {match:6s}")
-
+                print("Position | Search Result | Relevant? | Ideal Ranking")
+                print("-" * 75)
+                for i in range(k):
+                    search_doc = str(search_results[i]) if i < len(search_results) else "<empty>"
+                    ideal_doc = str(gt_ids[i]) if i < len(gt_ids) else "<empty>"
+                    is_relevant = "✓" if (i < len(search_results) and search_results[i] in gt_ids) else "✗"
+                    print(f"{i+1:8d} | {search_doc:25s} | {is_relevant:9s} | {ideal_doc:25s} ")
+               
             ndcg_score = compute_ndcg(ground_truth, search_results, k, method=scoring, debug=debug)
 
             individual_scores[query_id] = ndcg_score
