@@ -29,6 +29,7 @@ def compute_ndcg(ideal_ranking, search_results, k, method='binary', debug=False)
         debug: If True, print detailed NDCG calculation steps
     Returns:
         NDCG@k score between 0 and 1
+        Ideal scores dict for reference
     """
 
     ideal_scores = compute_scores(ideal_ranking, method=method)
@@ -112,7 +113,7 @@ def compute_ndcg(ideal_ranking, search_results, k, method='binary', debug=False)
         print(f"NDCG@{k} = {dcg:.4f} / {idcg:.4f}")
         print(f"NDCG@{k} = {ndcg:.4f}")
 
-    return ndcg
+    return ndcg, ideal_scores
 
 # Compute score for docs in ideal ranking
 def compute_scores(ideal_ranking: List[Any], method: str = ['binary','inverse_rank','decay','score']) -> Dict[str, float]:
@@ -214,7 +215,7 @@ def batch_evaluate_ndcg(search_results_dict, ground_truth_dict, k, debug=False, 
             'decay' - use exponential decay graded relevance
         
     Returns:
-        Dict with individual NDCG scores and average NDCG across all queries
+        Dict with individual NDCG scores and average NDCG across all queries, as well as ground truth
         
     Example:
         # For graded relevance with ideal rankings:
@@ -239,24 +240,25 @@ def batch_evaluate_ndcg(search_results_dict, ground_truth_dict, k, debug=False, 
         results = batch_evaluate_ndcg(search_results, relevant_docs, k=3,'binary')
     """
     if not search_results_dict or not ground_truth_dict:
-        return {'individual_scores': {}, 'average_ndcg': 0.0, 'total_queries': 0}
+        return {'individual_scores': {}, 'average_ndcg': 0.0, 'total_queries': 0, 'ground_truth': {}}
     
     individual_scores = {}
     total_ndcg = 0.0
     evaluated_queries = 0
+    ground_truth = {}
     
     for query_id in search_results_dict:
         if query_id in ground_truth_dict:
             search_results = search_results_dict[query_id]
-            ground_truth = ground_truth_dict[query_id]
+            query_ground_truth = ground_truth_dict[query_id]
             
             if debug:
                 # Ground truth might be a list of Ids or Dicts with scores
                 # For debugging we just need list of Ids
-                if isinstance(ground_truth, list) and all(isinstance(item, dict) for item in ground_truth):
-                    gt_ids = [str(item['doc_id']) for item in ground_truth]
+                if isinstance(query_ground_truth, list) and all(isinstance(item, dict) for item in query_ground_truth):
+                    gt_ids = [str(item['doc_id']) for item in query_ground_truth]
                 else:
-                    gt_ids = ground_truth
+                    gt_ids = query_ground_truth
 
                 print(f"\n=== Debug Info for Query: {query_id} ===")
                 print(f"Ideal ranking: {gt_ids}")
@@ -272,7 +274,7 @@ def batch_evaluate_ndcg(search_results_dict, ground_truth_dict, k, debug=False, 
                     is_relevant = "✓" if (i < len(search_results) and search_results[i] in gt_ids) else "✗"
                     print(f"{i+1:8d} | {search_doc:25s} | {is_relevant:9s} | {ideal_doc:25s} ")
                
-            ndcg_score = compute_ndcg(ground_truth, search_results, k, method=scoring, debug=debug)
+            ndcg_score,ground_truth[query_id] = compute_ndcg(query_ground_truth, search_results, k, method=scoring, debug=debug)
 
             individual_scores[query_id] = ndcg_score
             total_ndcg += ndcg_score
@@ -283,7 +285,8 @@ def batch_evaluate_ndcg(search_results_dict, ground_truth_dict, k, debug=False, 
     return {
         'individual_scores': individual_scores,
         'average_ndcg': average_ndcg,
-        'total_queries': evaluated_queries
+        'total_queries': evaluated_queries,
+        'ground_truth': ground_truth
     }
 
 """
