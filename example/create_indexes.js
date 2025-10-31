@@ -62,7 +62,7 @@ try {
                 {
                     type: 'vector',
                     path: 'embedding.voyage-context-3.1024d',
-                    numDimensions: 2048,
+                    numDimensions: 1024,
                     similarity: 'dotProduct'
                 },
             {

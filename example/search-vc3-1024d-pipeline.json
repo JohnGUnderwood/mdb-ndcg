@@ -1,0 +1,9 @@
+[{
+    "$vectorSearch": {
+        "index":"{{INDEX_NAME}}",
+        "queryVector": "{{QUERY}}",
+        "path": "embedding.voyage-context-3.1024d",
+        "limit": 20,
+        "numCandidates": 100
+    }
+}]
