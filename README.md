@@ -2,6 +2,9 @@
 
 Evaluate search systems using NDCG (Normalized Discounted Cumulative Gain) with MongoDB aggregation pipelines.
 
+You'll need MongoDB Search active with your cluster to run the evaluations. The fastest way to get set up is with [MongoDB Community running locally](https://www.mongodb.com/docs/atlas/atlas-search/tutorial/?deployment-type=self).
+You can also use [search in Atlas Clusters](https://www.mongodb.com/docs/atlas/atlas-search/tutorial/?deployment-type=atlas&language-atlas-only-2=atlas-ui).
+
 ## Key Features
 
 - Execute MongoDB search pipelines with dynamic query injection
